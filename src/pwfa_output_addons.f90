@@ -78,6 +78,17 @@
    time2dump=0
   endif
  endif
+
+
+ !---Write PS tracked particles---!
+ if (L_PTracking .and. tnow>=PT_output) then
+  call write_PS_trackedparticles(tnow,x0,x1,ym,1,jmp,countPSTR) !->force e-tracking
+  PT_output=PT_output+PT_delta
+  countPSTR=countPSTR+1
+  if(PT_output>PT_tend) L_PTracking=.false.
+ endif
+
+
  end subroutine bunch_output_struct
 
  !--- --- ---!

@@ -1184,7 +1184,160 @@
  endif
  end subroutine part_pdata_out
 
- !--------------------------
+ !--------------------------!
+ !--------------------------!
+
+ subroutine write_PS_trackedparticles(tnow,x0,x1,ym,pid,jmp,countPSTR)
+ character(38) :: fname_out
+ character(42) :: fname_outl
+ real(dp),intent(in) :: tnow,x0,x1,ym
+ integer,intent(in) :: pid,jmp,countPSTR
+ real(sp),allocatable :: pdata(:)
+ integer(dp) :: nptot_global_reduced
+ integer :: ik,p,q,np,ip,ip_max,nptot
+ integer :: lenp,ip_loc(npe),ndv,i_end
+ integer(offset_kind) :: disp,disp_col
+ real(dp) :: xx,yy,zz
+ real(dp) :: wgh
+ real(sp) :: ch(2)
+ character(4) :: num2str
+ character(3) :: num3str
+ integer,parameter :: file_version = 4
+
+ equivalence(wgh,ch)
+
+
+ ndv=nd2+2
+ np=loc_npart(imody,imodz,imodx,pid)
+ ip=0
+ if(ndim >2)then
+  do p=1,np,jmp
+   yy=spec(pid)%part(p,2)
+   zz=spec(pid)%part(p,3)
+   if(abs(yy)<=ym.and.abs(zz)<=ym)then
+    xx=spec(pid)%part(p,1)
+    if(xx>=x0.and.xx <=x1)then
+      if(spec(pid)%part(p,7)>100.) then !condition ---> verify
+       ip=ip+1
+       do q=1,nd2+1
+        ebfp(ip,q)=spec(pid)%part(p,q)
+       end do
+     endif
+    endif
+   endif
+  end do
+ else
+  do p=1,np,jmp
+   yy=spec(pid)%part(p,2)
+   if(abs(yy)<=ym)then
+    xx=spec(pid)%part(p,1)
+    if(xx>=x0.and.xx<=x1)then
+      if(spec(pid)%part(p,5)>100.) then !condition ---> verify
+       ip=ip+1
+       do q=1,nd2+1
+        ebfp(ip,q)=spec(pid)%part(p,q)
+       end do
+     endif
+    endif
+   endif
+  end do
+ endif
+ ip_loc(mype+1)=ip
+
+ ip=ip_loc(mype+1)
+ call intvec_distribute(ip,ip_loc,npe)
+
+
+ ! this differs from nptot_global since it represents just the reduced number of particles
+ ! that will be present in the output (should be equal to nptot_global for p_jump=1)!
+ nptot_global_reduced=0
+ !nptot_global_reduced=sum(ip_loc(1:npe))
+ do ik=1,npe
+  nptot_global_reduced=nptot_global_reduced+ip_loc(ik)
+ end do
+ if (nptot_global < 1E9) then
+  nptot=int(nptot_global_reduced)
+ else
+  nptot=-1
+ endif
+
+
+
+ ip_max=ip
+ if(pe0)ip_max=maxval(ip_loc(1:npe))
+ lenp=ndv*ip
+ allocate(pdata(lenp))
+ ik=0
+ do p=1,ip
+  do q=1,nd2
+   ik=ik+1
+   pdata(ik)=real(ebfp(p,q),sp)
+  end do
+  wgh=ebfp(p,nd2+1)
+  ik=ik+1
+  pdata(ik)=ch(1)
+  ik=ik+1
+  pdata(ik)=ch(2)
+ end do
+ if(ik /= lenp)write(6,'(a16,3i8)')'wrong pdata size',mype,lenp,ik
+
+ int_par=0
+ call endian(i_end)
+ real_par=0.0
+
+ real_par(1:20) =(/real(tnow,sp),real(xmin,sp),real(xmax,sp),real(ymin,sp),&
+  real(ymax,sp),real(zmin,sp),real(zmax,sp),real(w0_x,sp),real(w0_y,sp),&
+  real(n_over_nc,sp),real(a0,sp),real(lam0,sp),real(E0,sp),real(ompe,sp),&
+  real(np_per_cell,sp),real(targ_in,sp),real(targ_end,sp),real(unit_charge(pid),sp),&
+  real(mass(pid),sp),0.0_sp/)
+
+ int_par(1:20) = (/npe,nx,ny_loc,nz_loc,jmp,iby,iform,&
+  model_id,dmodel_id,nsp,curr_ndim,mp_per_cell(1),&
+  LPf_ord,der_ord,iform,pid,nptot,ndv,file_version,i_end/)
+
+ write(num2str,'(1I4.4)') countPSTR
+ write(num3str,'(1I3.3)') imodz
+ fname_out ='PS_tracked_particles'//'/'//'tracking_'//num2str//'.bin'
+ fname_outl='PS_tracked_particles'//'/'//'tracking_'//num2str//'_'//num3str//'.bin'
+
+ disp=0
+ disp_col=0
+ if(pe0)then
+  open(10,file='PS_tracked_particles'//'/'//'tracking_'//num2str//'.dat',form='formatted')
+  write(10,*)' Integer parameters'
+  write(10,'(4i14)')int_par
+  write(10,*)' Real parameters'
+  write(10,'(4e14.5)')real_par
+  write(10,*)' Number of particles'
+  write(10,'(4i20)')nptot_global_reduced
+  close(10)
+  write(6,*)'Particles param written on file: '//'PS_tracked_particles'//'/'//'tracking_'//num2str//'.dat'
+ else
+  disp=mype+ndv*sum(ip_loc(1:mype))  ! da usare con mpi_write_part
+ endif
+
+ if(MOD(mype,npe_yloc) > 0) disp_col=ndv*sum(ip_loc(imodz*npe_yloc+1:mype)) ! da usare con mpi_write_part_col
+
+ disp=disp*4  ! sia gli int che i float sono di 4 bytes
+ disp_col=disp_col*4
+
+ if((ndim<3).or.(L_force_singlefile_output))then
+  call mpi_write_part(pdata,lenp,ip,disp,38,fname_out)
+ else
+  call mpi_write_part_col(pdata,lenp,disp_col,42,fname_outl)
+ endif
+
+ if(allocated(pdata))deallocate(pdata)
+ if(pe0)then
+  write(6,*)'Tracked Particle written on File: '//fname_out
+  write(6,*)'Tracked Particle Output logical flag ',L_force_singlefile_output
+ endif
+ end subroutine write_PS_trackedparticles
+
+
+
+
+ !---------------------------!
 
  subroutine part_bdata_out(tnow,pid,jmp)
 

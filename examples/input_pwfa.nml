@@ -156,3 +156,10 @@
       beta_twiss(1)=5.3802083,
       beta_twiss(2)=5.5187334593,
 /
+
+&PARTICLE_TRACKING
+	L_PTracking=.T.,
+	PT_init,
+	PT_tend,
+	n_PT_output,
+/

@@ -595,9 +595,11 @@
   call read_bunch_namelist
   call read_bunch_TWISS_namelist
   call read_poloidal_field_namelist
+  call read_ParticleTracking_namelist
   nsb=n_bunches
  endif
  call write_read_nml
+ if(L_PTracking) call create_folder("PS_tracked_particles")
  ns_ioniz=0
  spl_ord=2
  RK_ord=0
@@ -695,6 +697,9 @@
   ! in general data (nouts+1 times)
   dtout=(tmax-tstart)/nouts
   dtdia=(tmax-tstart)/iene
+  PT_output=PT_init
+  PT_delta=(PT_tend-PT_init)/real(n_PT_output)
+  countPSTR=0
 
  case (1) ! reads from dump evolved data
   if (.not.L_first_output_on_restart) then
@@ -1238,4 +1243,3 @@
  !---------------------------
 
  end program ALaDyn
-

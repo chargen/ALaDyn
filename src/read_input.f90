@@ -322,6 +322,23 @@
  end subroutine read_poloidal_field_namelist
 
 
+ SUBROUTINE read_ParticleTracking_namelist
+ !CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+ !C
+ !C Reads Particle Tracking parameters
+ !C
+ !CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+
+ NAMELIST/PTRACKING/L_PTracking,PT_init,PT_tend,n_PT_output
+
+ open(1,file='input.nml', status='old')
+ L_PTracking = .false.
+ read(1,PTRACKING,ERR=18,END=18)
+18 continue
+ close(1)
+ end subroutine read_ParticleTracking_namelist
+
+
 
  subroutine write_read_nml
  character(len=12) :: output_filename
@@ -352,6 +369,7 @@
  NAMELIST/BUNCH5/rho_b_5,gamma_5,xb_5,yb_5,zb_5,sx_5,sy_5,epsy_5,epsz_5,dg_5,np_5,bunch_type_5
  NAMELIST/TWISS/L_TWISS,alpha_twiss,beta_twiss
  NAMELIST/BPOLOIDAL/L_Bpoloidal,B_ex_poloidal,radius_poloidal
+ NAMELIST/PTRACKING/L_PTracking,PT_tinit,PT_tend,n_PT_output
 
  write(output_filename,29)'input_',id_new,'.nml'
 29 format(a6,i2.2,a4)
@@ -373,6 +391,7 @@
  write(1,nml=BUNCH5,ERR=30)
  write(1,nml=TWISS,ERR=30)
  write(1,nml=BPOLOIDAL,ERR=30)
+ write(1,nml=PTRACKING,ERR=30)
 30 continue
  close(1)
  END SUBROUTINE
